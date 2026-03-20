@@ -2,12 +2,11 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const axios = require('axios'); // Ginagamit para kumuha ng location data
+const axios = require('axios'); 
 
 const app = express();
 const server = http.createServer(app);
 
-// Importante ito para makuha ang totoong IP address kung naka-host sa Render
 app.set('trust proxy', true);
 
 app.use(cors());
@@ -25,38 +24,36 @@ io.on('connection', (socket) => {
   console.log('May pumasok na visitor:', socket.id);
 
   socket.on('visitor_joined', async (data) => {
-    // 1. Kunin ang IP address ng client
     let clientIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     
-    // Linisin ang IP address (minsan kasi comma-separated ito sa servers)
     if (clientIp.includes(',')) {
         clientIp = clientIp.split(',')[0].trim();
     }
 
-    // Default value kung sakaling pumalya ang pagkuha ng location
     let countryName = 'Unknown';
+    let cityName = 'Unknown'; // Dito natin isesave ang City
 
     try {
-      // 2. Kunin ang bansa gamit ang IP address (Free API)
-      // Note: Hindi ito gagana kung '::1' (localhost) ang IP. 
       if (clientIp !== '::1' && clientIp !== '127.0.0.1') {
           const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
           if (response.data && response.data.country) {
               countryName = response.data.country;
+              cityName = response.data.city || 'Unknown City'; // Kinukuha ang city
           }
       } else {
-          countryName = 'Localhost (Testing)';
+          countryName = 'Localhost';
+          cityName = 'Local';
       }
     } catch (error) {
       console.error('Error fetching location:', error.message);
     }
 
-    // 3. I-save ang data kasama ang bansa
     activeVisitors[socket.id] = {
       domain: data.domain,
       path: data.path,
       device: data.device,
-      country: countryName, // Dito natin ilalagay ang nakuhang bansa
+      country: countryName,
+      city: cityName, // Ipapasa natin yung city sa dashboard
       timestamp: Date.now()
     };
     
