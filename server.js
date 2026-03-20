@@ -2,12 +2,14 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const geoip = require('geoip-lite'); // <-- Gagamitin na natin ito imbes na axios
+// Tanggalin na natin ang axios dahil hindi na tayo tatawag sa external API
+const geoip = require('geoip-lite'); 
 
 const app = express();
 const server = http.createServer(app);
 
 app.set('trust proxy', true);
+
 app.use(cors());
 
 const io = new Server(server, {
@@ -19,16 +21,12 @@ const io = new Server(server, {
 
 let activeVisitors = {};
 
-// Function para ma-convert ang "PH" to "Philippines"
-const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
-
 io.on('connection', (socket) => {
   console.log('May pumasok na visitor:', socket.id);
 
-  socket.on('visitor_joined', (data) => { // Hindi na kailangan ng async
+  socket.on('visitor_joined', (data) => {
     let clientIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     
-    // Kunin ang tunay na IP kung dumaan sa proxy/load balancer
     if (clientIp.includes(',')) {
         clientIp = clientIp.split(',')[0].trim();
     }
@@ -36,18 +34,12 @@ io.on('connection', (socket) => {
     let countryName = 'Unknown';
     let cityName = 'Unknown City'; 
 
+    // Gamitin ang geoip-lite para hanapin ang location ng IP
     if (clientIp !== '::1' && clientIp !== '127.0.0.1') {
-        // Gagamitin ang geoip-lite (walang rate limit, mabilis)
         const geo = geoip.lookup(clientIp);
-        
         if (geo) {
+            countryName = geo.country || 'Unknown';
             cityName = geo.city || 'Unknown City';
-            try {
-                // I-convert ang 2-letter code to Full Country Name
-                countryName = geo.country ? regionNames.of(geo.country) : 'Unknown';
-            } catch (e) {
-                countryName = geo.country || 'Unknown';
-            }
         }
     } else {
         countryName = 'Localhost';
