@@ -31,14 +31,14 @@ io.on('connection', (socket) => {
     }
 
     let countryName = 'Unknown';
-    let cityName = 'Unknown'; // Dito natin isesave ang City
+    let cityName = 'Unknown'; 
 
     try {
       if (clientIp !== '::1' && clientIp !== '127.0.0.1') {
           const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
           if (response.data && response.data.country) {
               countryName = response.data.country;
-              cityName = response.data.city || 'Unknown City'; // Kinukuha ang city
+              cityName = response.data.city || 'Unknown City';
           }
       } else {
           countryName = 'Localhost';
@@ -48,13 +48,15 @@ io.on('connection', (socket) => {
       console.error('Error fetching location:', error.message);
     }
 
+    // Isesave natin sila as "online"
     activeVisitors[socket.id] = {
       domain: data.domain,
       path: data.path,
       device: data.device,
       country: countryName,
-      city: cityName, // Ipapasa natin yung city sa dashboard
-      timestamp: Date.now()
+      city: cityName,
+      timestamp: Date.now(),
+      status: 'online' // <-- Bagong dinagdag
     };
     
     io.emit('update_dashboard', Object.values(activeVisitors));
@@ -62,8 +64,20 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('Umalis ang visitor:', socket.id);
-    delete activeVisitors[socket.id];
-    io.emit('update_dashboard', Object.values(activeVisitors));
+    
+    // Imbes na i-delete agad, gagawin muna nating "offline"
+    if (activeVisitors[socket.id]) {
+        activeVisitors[socket.id].status = 'offline';
+        io.emit('update_dashboard', Object.values(activeVisitors));
+
+        // Timer: Hintay ng 5 minutes (300,000 ms) bago i-delete
+        setTimeout(() => {
+            if (activeVisitors[socket.id]) {
+                delete activeVisitors[socket.id];
+                io.emit('update_dashboard', Object.values(activeVisitors));
+            }
+        }, 5 * 60 * 1000);
+    }
   });
 });
 
