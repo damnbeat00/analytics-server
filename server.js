@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-// Tanggalin na natin ang axios dahil hindi na tayo tatawag sa external API
 const geoip = require('geoip-lite'); 
 
 const app = express();
@@ -10,6 +9,7 @@ const server = http.createServer(app);
 
 app.set('trust proxy', true);
 
+// Naka-set na sa * ang CORS para payagan ang lahat ng connection
 app.use(cors());
 
 const io = new Server(server, {
@@ -24,7 +24,8 @@ let activeVisitors = {};
 io.on('connection', (socket) => {
   console.log('May pumasok na visitor:', socket.id);
 
-  socket.on('visitor_joined', (data) => {
+  // NAAYOS NA: Pinalitan ng 'visitor_data' para tumugma sa ipinapadala ng website mo
+  socket.on('visitor_data', (data) => {
     let clientIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     
     if (clientIp.includes(',')) {
@@ -46,11 +47,14 @@ io.on('connection', (socket) => {
         cityName = 'Local';
     }
 
-    // Isesave natin sila as "online"
+    // Isesave natin sila as "online" kasama ang browser at referrer
     activeVisitors[socket.id] = {
+      id: socket.id, // Important para sa React/Dashboard list keys
       domain: data.domain,
       path: data.path,
       device: data.device,
+      browser: data.browser || 'Unknown',
+      referrer: data.referrer || 'Direct',
       country: countryName,
       city: cityName,
       timestamp: Date.now(),
